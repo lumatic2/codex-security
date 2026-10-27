@@ -3935,6 +3935,32 @@ describe("runtime directories and plugin Python boundary", () => {
     },
   );
 
+  test("names the outermost Windows ancestor that allows replacement", async () => {
+    const { home } = await credentialHome(false);
+    const sid = "S-1-5-21-111-222-333-1001";
+    const sandbox = "S-1-5-21-444-555-666-1002";
+    const directory = `O:${sid}G:SYD:P(A;OICI;FA;;;${sid})`;
+    const ancestors = credentialAncestors(home, directory);
+    ancestors[0] = `O:${sid}G:SYD:AI(A;OICIID;0x1301bf;;;${sandbox})(A;OICIID;FA;;;${sid})`;
+    ancestors[1] = `O:${sid}G:SYD:(A;OICI;0x1301bf;;;${sandbox})(A;OICI;FA;;;${sid})`;
+
+    const failure = await inspectWindowsCredentialAclSnapshot(home, sid, {
+      command: process.execPath,
+      args: [
+        "--eval",
+        `process.stdout.write(${JSON.stringify(windowsCredentialAclOutput([...ancestors, directory]))})`,
+      ],
+    }).catch((error: unknown) => error);
+
+    expect(failure).toBeInstanceOf(Error);
+    expect((failure as Error).message).toContain(
+      `ancestor could not be trusted: ${dirname(dirname(home))}.`,
+    );
+    expect((failure as Error).message).toContain(
+      "Choose a location outside this ancestor",
+    );
+  });
+
   test("rejects incomplete combined Windows credential ACL inspections", async () => {
     const { home } = await credentialHome(false);
     const sid = "S-1-5-21-111-222-333-1001";

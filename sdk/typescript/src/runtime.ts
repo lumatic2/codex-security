@@ -812,6 +812,8 @@ export async function inspectWindowsCredentialAclSnapshot(
     let descendantsArePrivate = true;
     let inspected = 0;
     let completed = false;
+    // Every ancestor is checked, so only the outermost rejected one can be avoided.
+    let ancestorFailure: Error | undefined;
     try {
       await streamWindowsCredentialAclDescriptors(
         options.command,
@@ -859,7 +861,7 @@ export async function inspectWindowsCredentialAclSnapshot(
                 ancestorPath === dirname(ancestorPath)
                   ? "This volume root is unsupported. Choose a location on a volume with trusted ancestry; another directory on the same volume will not resolve this."
                   : "Choose a location outside this ancestor with trusted ownership and permissions.";
-              throw new Error(
+              ancestorFailure = new Error(
                 `Windows private-directory ancestor could not be trusted: ${ancestorPath}. ${errorMessage(error)}. ${guidance}`,
                 { cause: error },
               );
@@ -867,6 +869,7 @@ export async function inspectWindowsCredentialAclSnapshot(
             return;
           }
 
+          if (ancestorFailure !== undefined) throw ancestorFailure;
           if (index === ancestors.length) {
             try {
               home = inspectWindowsCredentialAcl(descriptor, currentUserSid, {
@@ -902,6 +905,7 @@ export async function inspectWindowsCredentialAclSnapshot(
       if (error instanceof WindowsCredentialDescendantsChangedError) continue;
       throw error;
     }
+    if (ancestorFailure !== undefined) throw ancestorFailure;
     if (inspected <= ancestors.length) {
       throw new Error("Windows credential-home ancestry could not be verified");
     }
