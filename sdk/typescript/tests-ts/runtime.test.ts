@@ -3893,12 +3893,13 @@ describe("runtime directories and plugin Python boundary", () => {
   test.each(["parent", "volume root"] as const)(
     "identifies an Everyone-owned %s in streamed Windows ACL descriptors",
     async (location) => {
-      const { home } = await credentialHome(false);
+      const home = String.raw`C:\parent\home`;
       const sid = "S-1-5-21-111-222-333-1001";
       const directory = `O:${sid}G:SYD:P(A;OICI;FA;;;${sid})`;
-      const ancestors = credentialAncestors(home, directory);
-      const rejected = location === "parent" ? dirname(home) : parse(home).root;
-      ancestors[location === "parent" ? ancestors.length - 1 : 0] =
+      const ancestors = [directory, directory];
+      const rejected =
+        location === "parent" ? win32.dirname(home) : win32.parse(home).root;
+      ancestors[location === "parent" ? 1 : 0] =
         `O:WDG:SYD:P(A;OICI;FA;;;${sid})`;
 
       const failure = await inspectWindowsCredentialAclSnapshot(home, sid, {
